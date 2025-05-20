@@ -1,6 +1,128 @@
-import React, { useState } from "react";
+"use client";
+import React, { useState, ChangeEvent, FormEvent } from "react";
+import styled from "styled-components";
+// import { theme } from "@/styles/theme"; // Uncomment if you have a theme file
 
-const initialState = {
+// --- FORM STYLES ---
+const FormContainer = styled.div`
+  background: #fff;
+  border-radius: 16px;
+  padding: 40px 0;
+  max-width: 900px;
+  margin: 40px 0 40px 16px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  min-height: 500px;
+`;
+
+const FormInner = styled.form`
+  width: 80%;
+  margin: 0 auto;
+`;
+
+const Row = styled.div`
+  display: flex;
+  gap: 40px;
+  margin-bottom: 25px;
+`;
+
+const Group = styled.div`
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+`;
+
+const Label = styled.label`
+  font-size: 14px;
+  margin-bottom: 7px;
+  color: #222;
+`;
+
+const Input = styled.input`
+  padding: 12px 14px;
+  border: 1px solid rgb(181, 180, 180);
+  border-radius: 5px;
+  background: #f7f8fa;
+  font-size: 15px;
+  outline: none;
+  transition: border 0.2s;
+  &:focus {
+    border: 3.5px solid rgb(164, 52, 52);
+  }
+`;
+
+const Actions = styled.div`
+  display: flex;
+  justify-content: center;
+  margin-top: 30px;
+`;
+
+const Button = styled.button`
+  background: #00aa00; /* Use theme.colors.primary if available */
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 60px;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background 0.2s;
+  &:hover {
+    background: #444;
+  }
+`;
+// --- END FORM STYLES ---
+
+interface ContactPerson {
+  name: string;
+  position: string;
+  phone: string;
+  email: string;
+}
+
+interface ContractDetails {
+  startDate: string;
+  endDate: string;
+  contractNumber: string;
+  paymentFrequency: string;
+  premiumPerEmployee: string;
+  minimumEmployees: string;
+  maximumEmployees: string;
+}
+
+interface CoverageDetails {
+  percentage: string;
+  maxAmount: string;
+}
+
+interface CoveragePlan {
+  serviceType: string;
+  coverageType: string;
+  coverageDetails: CoverageDetails;
+}
+
+interface AdminCredentials {
+  username: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+}
+
+interface CorporateForm {
+  name: string;
+  registrationNumber: string;
+  address: string;
+  phone: string;
+  email: string;
+  website: string;
+  contactPerson: ContactPerson;
+  insuranceCompanyId: string;
+  contractDetails: ContractDetails;
+  coveragePlans: CoveragePlan[];
+  adminCredentials: AdminCredentials;
+}
+
+const initialForm: CorporateForm = {
   name: "",
   registrationNumber: "",
   address: "",
@@ -11,7 +133,7 @@ const initialState = {
     name: "",
     position: "",
     phone: "",
-    email: "",
+    email: ""
   },
   insuranceCompanyId: "",
   contractDetails: {
@@ -21,7 +143,7 @@ const initialState = {
     paymentFrequency: "",
     premiumPerEmployee: "",
     minimumEmployees: "",
-    maximumEmployees: "",
+    maximumEmployees: ""
   },
   coveragePlans: [
     {
@@ -29,9 +151,9 @@ const initialState = {
       coverageType: "",
       coverageDetails: {
         percentage: "",
-        maxAmount: "",
-      },
-    },
+        maxAmount: ""
+      }
+    }
   ],
   adminCredentials: {
     username: "",
@@ -39,98 +161,345 @@ const initialState = {
     password: "",
     firstName: "",
     lastName: "",
-    phoneNumber: "",
-  },
+    phoneNumber: ""
+  }
 };
 
-const CoopratorRegister = () => {
-  const [form, setForm] = useState(initialState);
+const steps = [
+  "Basic Info",
+  "Contact Person",
+  "Contract Details",
+  "Coverage Plans",
+  "Admin Credentials",
+  "Review & Submit"
+];
 
-  const handleChange = (e, path = []) => {
+const CorporateRegisterForm: React.FC = () => {
+  const [form, setForm] = useState<CorporateForm>(initialForm);
+  const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  // Handle top-level fields
+  const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    if (path.length === 0) {
-      setForm({ ...form, [name]: value });
-    } else {
-      setForm((prev) => {
-        let obj = { ...prev };
-        let ref = obj;
-        for (let i = 0; i < path.length - 1; i++) {
-          ref = ref[path[i]];
-        }
-        ref[path[path.length - 1]] = value;
-        return obj;
-      });
-    }
+    setForm({ ...form, [name]: value });
   };
 
-  const handleCoverageChange = (e, idx, field, subfield) => {
-    const { value } = e.target;
-    setForm((prev) => {
-      const plans = [...prev.coveragePlans];
-      if (subfield) {
-        plans[idx].coverageDetails[subfield] = value;
-      } else {
-        plans[idx][field] = value;
+  // Handle nested fields
+  const handleNestedChange = (
+    e: ChangeEvent<HTMLInputElement>,
+    section: "contactPerson" | "adminCredentials" | "contractDetails"
+  ) => {
+    const { name, value } = e.target;
+    setForm({
+      ...form,
+      [section]: {
+        ...(form[section] as unknown as Record<string, string>),
+        [name]: value
       }
-      return { ...prev, coveragePlans: plans };
     });
   };
 
-  const handleSubmit = (e) => {
+  // Handle contractDetails
+  const handleContractChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm({
+      ...form,
+      contractDetails: { ...form.contractDetails, [name]: value }
+    });
+  };
+
+  // Handle coveragePlans
+  const handleCoverageChange = (
+    e: ChangeEvent<HTMLInputElement>,
+    idx: number
+  ) => {
+    const { name, value } = e.target;
+    const plans = [...form.coveragePlans];
+    if (name === "percentage" || name === "maxAmount") {
+      plans[idx].coverageDetails = {
+        ...plans[idx].coverageDetails,
+        [name]: value
+      };
+    } else {
+      (plans[idx] as any)[name] = value;
+    }
+    setForm({ ...form, coveragePlans: plans });
+  };
+
+  // Add/Remove coverage plan
+  const addCoveragePlan = () => {
+    setForm({
+      ...form,
+      coveragePlans: [
+        ...form.coveragePlans,
+        {
+          serviceType: "",
+          coverageType: "",
+          coverageDetails: { percentage: "", maxAmount: "" }
+        }
+      ]
+    });
+  };
+  const removeCoveragePlan = (idx: number) => {
+    const plans = [...form.coveragePlans];
+    plans.splice(idx, 1);
+    setForm({ ...form, coveragePlans: plans });
+  };
+
+  // Handle admin credentials
+  const handleAdminChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setForm({
+      ...form,
+      adminCredentials: { ...form.adminCredentials, [name]: value }
+    });
+  };
+
+  // Submit handler
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    // POST to your API endpoint here
-    console.log(form);
+    // POST form to your API
+    try {
+      const res = await fetch("http://localhost:3000/corporate/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form)
+      });
+      if (!res.ok) throw new Error("Failed to register corporate");
+      alert("Corporate registered!");
+    } catch (err) {
+      if (err instanceof Error) {
+        alert(err.message);
+      } else {
+        alert("Unknown error");
+      }
+    }
+  };
+
+  const handleNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStep((prev) => Math.min(prev + 1, steps.length));
+  };
+  const handleBack = (e: React.FormEvent) => {
+    e.preventDefault();
+    setStep((prev) => Math.max(prev - 1, 1));
+  };
+
+  const renderStep = () => {
+    switch (step) {
+      case 1:
+        return (
+          <>
+            <Row>
+              <Group>
+                <Label>Name</Label>
+                <Input name="name" value={form.name} onChange={handleChange} required />
+              </Group>
+              <Group>
+                <Label>Registration Number</Label>
+                <Input name="registrationNumber" value={form.registrationNumber} onChange={handleChange} required />
+              </Group>
+            </Row>
+            <Row>
+              <Group>
+                <Label>Address</Label>
+                <Input name="address" value={form.address} onChange={handleChange} required />
+              </Group>
+              <Group>
+                <Label>Phone</Label>
+                <Input name="phone" value={form.phone} onChange={handleChange} required />
+              </Group>
+            </Row>
+            <Row>
+              <Group>
+                <Label>Email</Label>
+                <Input name="email" value={form.email} onChange={handleChange} required />
+              </Group>
+              <Group>
+                <Label>Website</Label>
+                <Input name="website" value={form.website} onChange={handleChange} />
+              </Group>
+            </Row>
+          </>
+        );
+      case 2:
+        return (
+          <>
+            <h3>Contact Person</h3>
+            <Row>
+              <Group>
+                <Label>Contact Name</Label>
+                <Input name="name" value={form.contactPerson.name} onChange={e => handleNestedChange(e, "contactPerson")}
+                  required />
+              </Group>
+              <Group>
+                <Label>Position</Label>
+                <Input name="position" value={form.contactPerson.position} onChange={e => handleNestedChange(e, "contactPerson")}
+                  required />
+              </Group>
+            </Row>
+            <Row>
+              <Group>
+                <Label>Phone</Label>
+                <Input name="phone" value={form.contactPerson.phone} onChange={e => handleNestedChange(e, "contactPerson")}
+                  required />
+              </Group>
+              <Group>
+                <Label>Email</Label>
+                <Input name="email" value={form.contactPerson.email} onChange={e => handleNestedChange(e, "contactPerson")}
+                  required />
+              </Group>
+            </Row>
+          </>
+        );
+      case 3:
+        return (
+          <>
+            <h3>Contract Details</h3>
+            <Row>
+              <Group>
+                <Label>Start Date</Label>
+                <Input name="startDate" value={form.contractDetails.startDate} onChange={handleContractChange} type="date" required />
+              </Group>
+              <Group>
+                <Label>End Date</Label>
+                <Input name="endDate" value={form.contractDetails.endDate} onChange={handleContractChange} type="date" required />
+              </Group>
+            </Row>
+            <Row>
+              <Group>
+                <Label>Contract Number</Label>
+                <Input name="contractNumber" value={form.contractDetails.contractNumber} onChange={handleContractChange} required />
+              </Group>
+              <Group>
+                <Label>Payment Frequency</Label>
+                <Input name="paymentFrequency" value={form.contractDetails.paymentFrequency} onChange={handleContractChange} required />
+              </Group>
+            </Row>
+            <Row>
+              <Group>
+                <Label>Premium Per Employee</Label>
+                <Input name="premiumPerEmployee" value={form.contractDetails.premiumPerEmployee} onChange={handleContractChange} type="number" required />
+              </Group>
+              <Group>
+                <Label>Minimum Employees</Label>
+                <Input name="minimumEmployees" value={form.contractDetails.minimumEmployees} onChange={handleContractChange} type="number" required />
+              </Group>
+              <Group>
+                <Label>Maximum Employees</Label>
+                <Input name="maximumEmployees" value={form.contractDetails.maximumEmployees} onChange={handleContractChange} type="number" required />
+              </Group>
+            </Row>
+          </>
+        );
+      case 4:
+        return (
+          <>
+            <h3>Coverage Plans</h3>
+            {form.coveragePlans.map((plan, idx) => (
+              <Row key={idx}>
+                <Group>
+                  <Label>Service Type</Label>
+                  <Input name="serviceType" value={plan.serviceType} onChange={e => handleCoverageChange(e, idx)} required />
+                </Group>
+                <Group>
+                  <Label>Coverage Type</Label>
+                  <Input name="coverageType" value={plan.coverageType} onChange={e => handleCoverageChange(e, idx)} required />
+                </Group>
+                <Group>
+                  <Label>Coverage %</Label>
+                  <Input name="percentage" value={plan.coverageDetails.percentage} onChange={e => handleCoverageChange(e, idx)} type="number" required />
+                </Group>
+                <Group>
+                  <Label>Max Amount</Label>
+                  <Input name="maxAmount" value={plan.coverageDetails.maxAmount} onChange={e => handleCoverageChange(e, idx)} type="number" required />
+                </Group>
+                <Group>
+                  <Label>&nbsp;</Label>
+                  <Button type="button" onClick={() => removeCoveragePlan(idx)} style={{ background: '#e74c3c', color: '#fff', minWidth: 32, padding: '0 12px' }}>Remove</Button>
+                </Group>
+              </Row>
+            ))}
+            <Actions>
+              <Button type="button" onClick={addCoveragePlan} style={{ background: '#00aa00', color: '#fff', minWidth: 32, padding: '0 12px' }}>Add Coverage Plan</Button>
+            </Actions>
+          </>
+        );
+      case 5:
+        return (
+          <>
+            <h3>Admin Credentials</h3>
+            <Row>
+              <Group>
+                <Label>Username</Label>
+                <Input name="username" value={form.adminCredentials.username} onChange={handleAdminChange} required />
+              </Group>
+              <Group>
+                <Label>Email</Label>
+                <Input name="email" value={form.adminCredentials.email} onChange={handleAdminChange} required />
+              </Group>
+            </Row>
+            <Row>
+              <Group>
+                <Label>Password</Label>
+                <Input name="password" value={form.adminCredentials.password} onChange={handleAdminChange} type="password" required />
+              </Group>
+              <Group>
+                <Label>First Name</Label>
+                <Input name="firstName" value={form.adminCredentials.firstName} onChange={handleAdminChange} required />
+              </Group>
+              <Group>
+                <Label>Last Name</Label>
+                <Input name="lastName" value={form.adminCredentials.lastName} onChange={handleAdminChange} required />
+              </Group>
+              <br/>
+              <Group>
+                <Label>Phone Number</Label>
+                <Input name="phoneNumber" value={form.adminCredentials.phoneNumber} onChange={handleAdminChange} required />
+              </Group>
+            </Row>
+          </>
+        );
+      case 6:
+        return (
+          <>
+            <h3>Review & Submit</h3>
+            <pre style={{ background: "#f7f8fa", padding: 16, borderRadius: 8, fontSize: 13 }}>
+              {JSON.stringify(form, null, 2)}
+            </pre>
+          </>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
-    <form onSubmit={handleSubmit}>
-      <h2>Register Cooperator</h2>
-      <input name="name" placeholder="Company Name" value={form.name} onChange={handleChange} />
-      <input name="registrationNumber" placeholder="Registration Number" value={form.registrationNumber} onChange={handleChange} />
-      <input name="address" placeholder="Address" value={form.address} onChange={handleChange} />
-      <input name="phone" placeholder="Phone" value={form.phone} onChange={handleChange} />
-      <input name="email" placeholder="Email" value={form.email} onChange={handleChange} />
-      <input name="website" placeholder="Website" value={form.website} onChange={handleChange} />
-
-      <h3>Contact Person</h3>
-      <input placeholder="Name" value={form.contactPerson.name} onChange={e => handleChange(e, ["contactPerson", "name"])} />
-      <input placeholder="Position" value={form.contactPerson.position} onChange={e => handleChange(e, ["contactPerson", "position"])} />
-      <input placeholder="Phone" value={form.contactPerson.phone} onChange={e => handleChange(e, ["contactPerson", "phone"])} />
-      <input placeholder="Email" value={form.contactPerson.email} onChange={e => handleChange(e, ["contactPerson", "email"])} />
-
-      <input name="insuranceCompanyId" placeholder="Insurance Company ID" value={form.insuranceCompanyId} onChange={handleChange} />
-
-      <h3>Contract Details</h3>
-      <input placeholder="Start Date" type="date" value={form.contractDetails.startDate} onChange={e => handleChange(e, ["contractDetails", "startDate"])} />
-      <input placeholder="End Date" type="date" value={form.contractDetails.endDate} onChange={e => handleChange(e, ["contractDetails", "endDate"])} />
-      <input placeholder="Contract Number" value={form.contractDetails.contractNumber} onChange={e => handleChange(e, ["contractDetails", "contractNumber"])} />
-      <input placeholder="Payment Frequency" value={form.contractDetails.paymentFrequency} onChange={e => handleChange(e, ["contractDetails", "paymentFrequency"])} />
-      <input placeholder="Premium Per Employee" type="number" value={form.contractDetails.premiumPerEmployee} onChange={e => handleChange(e, ["contractDetails", "premiumPerEmployee"])} />
-      <input placeholder="Minimum Employees" type="number" value={form.contractDetails.minimumEmployees} onChange={e => handleChange(e, ["contractDetails", "minimumEmployees"])} />
-      <input placeholder="Maximum Employees" type="number" value={form.contractDetails.maximumEmployees} onChange={e => handleChange(e, ["contractDetails", "maximumEmployees"])} />
-
-      <h3>Coverage Plans</h3>
-      {form.coveragePlans.map((plan, idx) => (
-        <div key={idx}>
-          <input placeholder="Service Type" value={plan.serviceType} onChange={e => handleCoverageChange(e, idx, "serviceType")}/>
-          <input placeholder="Coverage Type" value={plan.coverageType} onChange={e => handleCoverageChange(e, idx, "coverageType")}/>
-          <input placeholder="Coverage %" type="number" value={plan.coverageDetails.percentage} onChange={e => handleCoverageChange(e, idx, null, "percentage")}/>
-          <input placeholder="Max Amount" type="number" value={plan.coverageDetails.maxAmount} onChange={e => handleCoverageChange(e, idx, null, "maxAmount")}/>
-        </div>
-      ))}
-
-      <h3>Admin Credentials</h3>
-      <input placeholder="Username" value={form.adminCredentials.username} onChange={e => handleChange(e, ["adminCredentials", "username"])} />
-      <input placeholder="Email" value={form.adminCredentials.email} onChange={e => handleChange(e, ["adminCredentials", "email"])} />
-      <input placeholder="Password" type="password" value={form.adminCredentials.password} onChange={e => handleChange(e, ["adminCredentials", "password"])} />
-      <input placeholder="First Name" value={form.adminCredentials.firstName} onChange={e => handleChange(e, ["adminCredentials", "firstName"])} />
-      <input placeholder="Last Name" value={form.adminCredentials.lastName} onChange={e => handleChange(e, ["adminCredentials", "lastName"])} />
-      <input placeholder="Phone Number" value={form.adminCredentials.phoneNumber} onChange={e => handleChange(e, ["adminCredentials", "phoneNumber"])} />
-
-      <button type="submit">Register</button>
-    </form>
+    <FormContainer>
+      <FormInner onSubmit={step === steps.length ? handleSubmit : handleNext}>
+        <h2>Corporate Registration</h2>
+        {renderStep()}
+        <Actions>
+          {step > 1 && (
+            <Button type="button" onClick={handleBack} style={{ marginRight: 16 }}>
+              Back
+            </Button>
+          )}
+          {step < steps.length ? (
+            <Button type="button" onClick={handleNext}>
+              Next
+            </Button>
+          ) : (
+            <Button type="submit">Register Corporate</Button>
+          )}
+        </Actions>
+      </FormInner>
+    </FormContainer>
   );
 };
 
-export default CoopratorRegister;
+export default CorporateRegisterForm;
 
